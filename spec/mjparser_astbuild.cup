@@ -1,0 +1,433 @@
+/* ------------------------------- Import section START ---------------------------------- */
+
+package rs.ac.bg.etf.pp1;				/* Generisane klase idu u ovaj paket */
+
+import org.apache.log4j.*;
+import java_cup.runtime.*;
+import rs.ac.bg.etf.pp1.ast.*;
+
+
+
+/* ------------------------------- Import section END ---------------------------------- */
+
+
+
+/* -------------------- Metode za greske tokom parsiranja START ------------------------ */
+
+parser code {:
+	
+	Logger log = Logger.getLogger(getClass());
+	
+	boolean errorDetected;
+	// boolean errorDetected = false;
+   
+   
+    // slede redefinisani metodi za prijavu gresaka radi izmene teksta poruke
+    
+    
+    // Metoda koja se poziva kada ne mozemo da nastavimo parsiranje 
+    public void report_fatal_error(String message, Object info) throws java.lang.Exception {
+      done_parsing();
+      report_error(message, info);
+    }
+  
+  
+  	// Metoda u kojoj definisemo kako prijavljujemo gresku
+  	// Situacija u kojoj nastaje sintaksna greska je situacija u kojoj mozemo da se od te greske oporavimo
+    public void syntax_error(Symbol cur_token) {
+        report_error("\nSintaksna greska", cur_token);
+    }
+  
+  
+  	// Metoda koja se poziva kada parser NE MOZE da se oporavi od greske - greska se prijavljuje i parsiranje se zaustavlja
+    public void unrecovered_syntax_error(Symbol cur_token) throws java.lang.Exception {
+        report_fatal_error("Fatalna greska, parsiranje se ne moze nastaviti", cur_token);
+    }
+
+	
+	// Metoda za poruku za ispis greske
+    public void report_error(String message, Object info) {
+    	errorDetected = true;
+    	StringBuilder msg = new StringBuilder(message); 
+    	if (info instanceof Symbol)
+            msg.append (" na liniji ").append(((Symbol)info).left);
+        log.error(msg.toString());
+    }
+    
+    
+    
+    public void report_info(String message, Object info) {
+    	StringBuilder msg = new StringBuilder(message); 
+    	if (info instanceof Symbol)
+            msg.append (" na liniji ").append(((Symbol)info).left);
+        log.info(msg.toString());
+    }
+    
+:}
+
+
+
+init with {:
+	errorDetected = false;
+:}
+
+
+scan with {:
+
+	// Parser dohvata token od leksera i ako on nije null ispisujemo o kom simbolu je rec
+	
+	Symbol s = this.getScanner().next_token();
+	if (s != null && s.value != null) 
+		log.info(s.toString() + " " + s.value.toString());
+	return s;
+:}
+
+
+/* -------------------- Metode za greske tokom parsiranja END ------------------------ */
+
+
+
+/* -------------------- Lista terminala START -------------------- */
+
+terminal			PROGRAM, NAMESPACE, CONST, STATIC, VOID, READ, PRINT, RETURN, NEW;
+terminal			SEMI_COLON, COMMA, DOT;
+terminal			IF, ELSE, BREAK, CONTINUE, FOR, INCREMENT, DECREMENT;
+terminal			LEFT_CURLY_BRACKET, RIGHT_CURLY_BRACKET, LEFT_SQUARE_BRACKET, RIGHT_SQUARE_BRACKET, LEFT_PARENTHESIS, RIGHT_PARENTHESIS;
+terminal			BITWISE_AND, BITWISE_OR;
+terminal			ASSIGN_OP, SCOPE_OP;
+terminal			PLUS, MINUS, MULTIPLY, DIVIDE, MODULUS;
+terminal			IS_EQUAL, NOT_EQUAL, GREATER_THAN, GREATER_OR_EQUAL, LOWER_THAN, LOWER_OR_EQUAL;
+
+terminal			String IDENT;
+terminal			Integer NUM_CONST;
+terminal			Character CHAR_CONST;
+terminal			Boolean BOOL_CONST;
+
+/* -------------------- Lista terminala END -------------------- */
+
+
+
+/* --------------- Dodatni terminali koji postoje u MikroJava specifikaciji, ali se ne koriste START --------------- */
+
+terminal 			COLON, EXTENDS, ARROW, THIS, CLASS;
+
+/* --------------- Dodatni terminali koji postoje u MikroJava specifikaciji, ali se ne koriste END --------------- */
+
+
+
+/* -------------------- Lista neterminala START -------------------- */
+
+
+nonterminal			StaticInitializer StaticInitializer;
+nonterminal Label Label;
+nonterminal			ConstDecl ConstDecl;
+nonterminal ConstVarDeclList ConstVarDeclList;
+nonterminal MultipleNumConstList MultipleNumConstList;
+nonterminal MultipleCharConstList MultipleCharConstList;
+nonterminal MultipleBoolConstList MultipleBoolConstList;
+nonterminal			VarDecl VarDecl;
+nonterminal MultipleVarDeclList MultipleVarDeclList;
+nonterminal VarDeclList VarDeclList;
+nonterminal			Namespace Namespace;
+nonterminal NamespaceList NamespaceList;
+nonterminal NamespaceName NamespaceName;
+nonterminal			MethodDeclList MethodDeclList;
+nonterminal			Statement Statement;
+nonterminal StatementList StatementList;
+nonterminal			FormPars FormPars;
+nonterminal MultipleFormParsList MultipleFormParsList;
+nonterminal ActPars ActPars;
+nonterminal MultipleParamsList MultipleParamsList;
+nonterminal			DesignatorStatement DesignatorStatement;
+nonterminal			Assignop Assignop;
+nonterminal Relop Relop;
+nonterminal Mulop Mulop;
+nonterminal Addop Addop;
+nonterminal			Condition Condition;
+nonterminal CondTerm CondTerm;
+nonterminal MultipleCondTerms MultipleCondTerms;
+nonterminal CondFact CondFact;
+nonterminal MultipleCondFacts MultipleCondFacts;
+
+
+
+/* -------------------- Objektni cvorovi -------------------- */
+
+nonterminal	rs.etf.pp1.symboltable.concepts.Obj			Program, ProgramName;
+nonterminal	rs.etf.pp1.symboltable.concepts.Obj			MethodDecl, MethodTypeName, MethodVoidName;
+nonterminal	rs.etf.pp1.symboltable.concepts.Obj			Designator, RegularDesignatorName, ScopedDesignatorName, MultipleDesignatorExpansion;
+
+
+/* -------------------- Strukturni cvorovi START -------------------- */
+
+nonterminal	rs.etf.pp1.symboltable.concepts.Struct		Type, Factor, Term, NegatedTerm, Expr;
+nonterminal	rs.etf.pp1.symboltable.concepts.Struct		NumConstValue;
+nonterminal	rs.etf.pp1.symboltable.concepts.Struct		MultipleAddopTerms, MultipleMulopFactors;
+
+
+/* -------------------- Lista neterminala END -------------------- */
+
+
+/* Postavljanje prioriteta za IF-ELSE konstrukciju */
+precedence left ELSE;
+
+
+
+/* -------------------- Gramatika jezika START -------------------- */
+
+
+Program					::=		(Program) PROGRAM ProgramName:p NamespaceList:N1 ConstVarDeclList:C2 LEFT_CURLY_BRACKET MethodDeclList:M3 RIGHT_CURLY_BRACKET {: RESULT=new Program(p, N1, C2, M3); RESULT.setLine(pleft); :}
+						;
+						
+						
+ProgramName				::=		(ProgramName) IDENT:programName {: RESULT=new ProgramName(programName); RESULT.setLine(programNameleft); :}
+						;						
+					
+					
+Namespace				::=		(Namespace) NAMESPACE NamespaceName:N1 LEFT_CURLY_BRACKET ConstVarDeclList:C2 LEFT_CURLY_BRACKET MethodDeclList:M3 RIGHT_CURLY_BRACKET RIGHT_CURLY_BRACKET {: RESULT=new Namespace(N1, C2, M3); RESULT.setLine(N1left); :}
+						;
+						
+						
+NamespaceName			::=		(NamespaceName) IDENT:namespaceName {: RESULT=new NamespaceName(namespaceName); RESULT.setLine(namespaceNameleft); :}
+						;				
+					
+					
+NamespaceList			::=		(NoNamespace) {: RESULT=new NoNamespace(); :} /* epsilon */
+						|		(MultipleNamespace) NamespaceList:N1 Namespace:N2 {: RESULT=new MultipleNamespace(N1, N2); RESULT.setLine(N1left); :}
+						;
+
+
+ConstDecl				::=		(NumConstDecl)  CONST Type:constType IDENT:numConstName  ASSIGN_OP NUM_CONST:numValue   MultipleNumConstList:M1  SEMI_COLON {: RESULT=new NumConstDecl(constType, numConstName, numValue, M1); RESULT.setLine(constTypeleft); :}
+						|		(CharConstDecl) CONST Type:constType IDENT:charConstName ASSIGN_OP CHAR_CONST:charValue MultipleCharConstList:M1 SEMI_COLON {: RESULT=new CharConstDecl(constType, charConstName, charValue, M1); RESULT.setLine(constTypeleft); :}
+						|		(BoolConstDecl) CONST Type:constType IDENT:boolConstName ASSIGN_OP BOOL_CONST:boolValue MultipleBoolConstList:M1 SEMI_COLON {: RESULT=new BoolConstDecl(constType, boolConstName, boolValue, M1); RESULT.setLine(constTypeleft); :}
+						;
+
+
+ConstVarDeclList		::=		(NoConstVarDecl) {: RESULT=new NoConstVarDecl(); :} /* epsilon */
+						|		(MultipleConstDecl) ConstVarDeclList:C1 ConstDecl:C2 {: RESULT=new MultipleConstDecl(C1, C2); RESULT.setLine(C1left); :}
+						|		(MultipleVarDecl) ConstVarDeclList:C1 VarDecl:V2 {: RESULT=new MultipleVarDecl(C1, V2); RESULT.setLine(C1left); :}
+						;	
+					
+					
+MultipleNumConstList	::=		(NoMultipleNumConstList) {: RESULT=new NoMultipleNumConstList(); :} /* epsilon */
+						|		(MultipleNumConst) MultipleNumConstList:M1 COMMA IDENT:numConstName ASSIGN_OP NumConstValue:numConstValue {: RESULT=new MultipleNumConst(M1, numConstName, numConstValue); RESULT.setLine(M1left); :}
+						;
+						
+						
+NumConstValue			::=		(NumConstValue) NUM_CONST:numConstValue {: RESULT=new NumConstValue(numConstValue); RESULT.setLine(numConstValueleft); :}						
+						;
+						
+
+MultipleCharConstList	::=		(NoMultipleCharConstList) {: RESULT=new NoMultipleCharConstList(); :} /* epsilon */
+						|		(MultipleCharConst) MultipleCharConstList:M1 COMMA IDENT:charConstName ASSIGN_OP CHAR_CONST:C2 {: RESULT=new MultipleCharConst(M1, charConstName, C2); RESULT.setLine(M1left); :}
+						;
+						
+						
+MultipleBoolConstList	::=		(NoMultipleBoolConstList) {: RESULT=new NoMultipleBoolConstList(); :} /* epsilon */
+						|		(MultipleBoolConst) MultipleBoolConstList:M1 COMMA IDENT:boolConstName ASSIGN_OP BOOL_CONST:B2 {: RESULT=new MultipleBoolConst(M1, boolConstName, B2); RESULT.setLine(M1left); :}
+						;
+						
+						
+VarDecl					::=		(RegularVariable) Type:variableType IDENT:variableName MultipleVarDeclList:M1 SEMI_COLON {: RESULT=new RegularVariable(variableType, variableName, M1); RESULT.setLine(variableTypeleft); :}
+						|		(ArrayVariable)   Type:T1 IDENT:arrayName LEFT_SQUARE_BRACKET RIGHT_SQUARE_BRACKET MultipleVarDeclList:M2 SEMI_COLON {: RESULT=new ArrayVariable(T1, arrayName, M2); RESULT.setLine(T1left); :}
+						;
+						
+						
+MultipleVarDeclList		::=		(NoMultipleVarDeclList) {: RESULT=new NoMultipleVarDeclList(); :} /* epsilon */
+						|		(MultipleRegularVarDecl) MultipleVarDeclList:M1 COMMA IDENT:additionalVariableName {: RESULT=new MultipleRegularVarDecl(M1, additionalVariableName); RESULT.setLine(M1left); :}
+						|		(MultipleArrayVarDecl) MultipleVarDeclList:M1 COMMA IDENT:additionalArrayVarName LEFT_SQUARE_BRACKET RIGHT_SQUARE_BRACKET {: RESULT=new MultipleArrayVarDecl(M1, additionalArrayVarName); RESULT.setLine(M1left); :}
+						;
+						
+						
+StaticInitializer		::=		(StaticInitializer) STATIC LEFT_CURLY_BRACKET StatementList:S1 RIGHT_CURLY_BRACKET {: RESULT=new StaticInitializer(S1); RESULT.setLine(S1left); :}
+						;
+						
+						
+StatementList			::=		(NoStatementList) {: RESULT=new NoStatementList(); :} /* epsilon */
+						|		(MultipleStatementList) StatementList:S1 Statement:S2 {: RESULT=new MultipleStatementList(S1, S2); RESULT.setLine(S1left); :}
+						;
+						
+						
+MethodDecl				::=		(RetTypeMethodNoParam) 		MethodTypeName:M1 LEFT_PARENTHESIS 		 RIGHT_PARENTHESIS VarDeclList:V2 LEFT_CURLY_BRACKET StatementList:S3 RIGHT_CURLY_BRACKET {: RESULT=new RetTypeMethodNoParam(M1, V2, S3); RESULT.setLine(M1left); :}
+						|		(RetTypeMethodWithParam)	MethodTypeName:M1 LEFT_PARENTHESIS FormPars:F2 RIGHT_PARENTHESIS VarDeclList:V3 LEFT_CURLY_BRACKET StatementList:S4 RIGHT_CURLY_BRACKET {: RESULT=new RetTypeMethodWithParam(M1, F2, V3, S4); RESULT.setLine(M1left); :}
+						|		(VoidMethodNoParam)			MethodVoidName:M1 LEFT_PARENTHESIS 		 RIGHT_PARENTHESIS VarDeclList:V2 LEFT_CURLY_BRACKET StatementList:S3 RIGHT_CURLY_BRACKET {: RESULT=new VoidMethodNoParam(M1, V2, S3); RESULT.setLine(M1left); :}
+						|		(VoidMethodWithParam)		MethodVoidName:M1 LEFT_PARENTHESIS FormPars:F2 RIGHT_PARENTHESIS VarDeclList:V3 LEFT_CURLY_BRACKET StatementList:S4 RIGHT_CURLY_BRACKET {: RESULT=new VoidMethodWithParam(M1, F2, V3, S4); RESULT.setLine(M1left); :}
+						;
+						
+
+MethodTypeName			::=		(MethodTypeName) Type:returnType IDENT:methodName {: RESULT=new MethodTypeName(returnType, methodName); RESULT.setLine(returnTypeleft); :}
+						;
+						
+						
+MethodVoidName			::=		(MethodVoidName) VOID:voidType IDENT:methodName {: RESULT=new MethodVoidName(methodName); RESULT.setLine(methodNameleft); :}
+						;
+						
+						
+MethodDeclList			::=		(NoMethodDecl) {: RESULT=new NoMethodDecl(); :} /* epsilon */
+						|		(MultipleMethodDecl) MethodDeclList:M1 MethodDecl:M2 {: RESULT=new MultipleMethodDecl(M1, M2); RESULT.setLine(M1left); :}
+						;
+						
+						
+VarDeclList				::=		(NoVarDecl) {: RESULT=new NoVarDecl(); :} /* epsilon */
+						|		(VarDeclarations) VarDeclList:V1 VarDecl:V2 {: RESULT=new VarDeclarations(V1, V2); RESULT.setLine(V1left); :}
+						;
+						
+
+FormPars				::=		(RegularParam) Type:T1 IDENT:I2 MultipleFormParsList:M3 {: RESULT=new RegularParam(T1, I2, M3); RESULT.setLine(T1left); :}
+						|		(ArrayParam) Type:T1 IDENT:I2 LEFT_SQUARE_BRACKET RIGHT_SQUARE_BRACKET MultipleFormParsList:M3 {: RESULT=new ArrayParam(T1, I2, M3); RESULT.setLine(T1left); :}
+						;
+						
+						
+MultipleFormParsList	::=		(NoMultipleFormPars) {: RESULT=new NoMultipleFormPars(); :} /* epsilon */
+						|		(MultipleRegularFormPars) MultipleFormParsList:M1 COMMA Type:T2 IDENT:I3 {: RESULT=new MultipleRegularFormPars(M1, T2, I3); RESULT.setLine(M1left); :}
+						|		(MultipleArrayFormPars) MultipleFormParsList:M1 COMMA Type:T2 IDENT:I3 LEFT_SQUARE_BRACKET RIGHT_SQUARE_BRACKET {: RESULT=new MultipleArrayFormPars(M1, T2, I3); RESULT.setLine(M1left); :}
+						;
+						
+						
+Type					::=		(RegularType) IDENT:typeName {: RESULT=new RegularType(typeName); RESULT.setLine(typeNameleft); :}
+						|		(ScopedType) IDENT:namespaceName SCOPE_OP IDENT:typeName {: RESULT=new ScopedType(namespaceName, typeName); RESULT.setLine(namespaceNameleft); :}
+						;
+						
+						
+Statement				::=		(DeclarationStatement) DesignatorStatement:D1 SEMI_COLON {: RESULT=new DeclarationStatement(D1); RESULT.setLine(D1left); :}
+						|		(IfStatement) IF LEFT_PARENTHESIS Condition:C1 RIGHT_PARENTHESIS Statement:S2 {: RESULT=new IfStatement(C1, S2); RESULT.setLine(C1left); :}
+						|		(IfElseStatement) IF LEFT_PARENTHESIS Condition:C1 RIGHT_PARENTHESIS Statement:S2 ELSE Statement:S3 {: RESULT=new IfElseStatement(C1, S2, S3); RESULT.setLine(C1left); :}
+						|		(BreakStatement) BREAK SEMI_COLON {: RESULT=new BreakStatement(); :}
+						|		(ContinueStatement) CONTINUE SEMI_COLON {: RESULT=new ContinueStatement(); :}
+						|		(NoReturnStatement) RETURN SEMI_COLON {: RESULT=new NoReturnStatement(); :}
+						|		(ReturnStatement) RETURN Expr:returnExpr SEMI_COLON {: RESULT=new ReturnStatement(returnExpr); RESULT.setLine(returnExprleft); :}
+						|		(ReadStatement) READ LEFT_PARENTHESIS Designator:D1 RIGHT_PARENTHESIS SEMI_COLON {: RESULT=new ReadStatement(D1); RESULT.setLine(D1left); :}
+						|		(PrintNoArgStatement) PRINT LEFT_PARENTHESIS Expr:E1 RIGHT_PARENTHESIS SEMI_COLON {: RESULT=new PrintNoArgStatement(E1); RESULT.setLine(E1left); :}
+						|		(PrintWithArgStatement) PRINT LEFT_PARENTHESIS Expr:E1 COMMA NUM_CONST:width RIGHT_PARENTHESIS SEMI_COLON {: RESULT=new PrintWithArgStatement(E1, width); RESULT.setLine(E1left); :}
+						|		(StatementBlock) LEFT_CURLY_BRACKET StatementList:S1 RIGHT_CURLY_BRACKET {: RESULT=new StatementBlock(S1); RESULT.setLine(S1left); :}
+						
+						|		(SyntaxError) error SEMI_COLON:l
+								{: parser.report_error("Oporavak od greske do ; na liniji " + lleft, null); :} {: RESULT=new SyntaxError(); :}
+						;
+						
+						
+DesignatorStatement		::=		(AssignmentStatement) Designator:destination Assignop:A1 Expr:source {: RESULT=new AssignmentStatement(destination, A1, source); RESULT.setLine(destinationleft); :}
+						|		(FunctionCallNoParam) Designator:D1 LEFT_PARENTHESIS RIGHT_PARENTHESIS {: RESULT=new FunctionCallNoParam(D1); RESULT.setLine(D1left); :}
+						|		(FunctionCallWithParam) Designator:D1 LEFT_PARENTHESIS ActPars:A2 RIGHT_PARENTHESIS {: RESULT=new FunctionCallWithParam(D1, A2); RESULT.setLine(D1left); :}
+						|		(IncrementStatement) Designator:D1 INCREMENT {: RESULT=new IncrementStatement(D1); RESULT.setLine(D1left); :}
+						|		(DecrementStatement) Designator:D1 DECREMENT {: RESULT=new DecrementStatement(D1); RESULT.setLine(D1left); :}
+						;
+						
+						
+ActPars					::=		(ActualParameters) Expr:E1 MultipleParamsList:M2 {: RESULT=new ActualParameters(E1, M2); RESULT.setLine(E1left); :}	
+						;
+						
+						
+MultipleParamsList		::=		(NoMultipleParams) {: RESULT=new NoMultipleParams(); :} /* epsilon */
+						|		(MultipleParams) MultipleParamsList:M1 COMMA Expr:E2 {: RESULT=new MultipleParams(M1, E2); RESULT.setLine(M1left); :}
+						;
+						
+						
+Condition				::=		(ConditionBitwiseOr) CondTerm:C1 MultipleCondTerms:M2 {: RESULT=new ConditionBitwiseOr(C1, M2); RESULT.setLine(C1left); :}
+						;
+						
+						
+MultipleCondTerms		::=		(NoMultipleCondTerms) {: RESULT=new NoMultipleCondTerms(); :} /* epsilon */
+						|		(MultipleConditionsOr) MultipleCondTerms:M1 BITWISE_OR CondTerm:C2 {: RESULT=new MultipleConditionsOr(M1, C2); RESULT.setLine(M1left); :}	
+						;
+						
+						
+CondTerm				::=		(ConditionBitwiseAnd) CondFact:C1 MultipleCondFacts:M2 {: RESULT=new ConditionBitwiseAnd(C1, M2); RESULT.setLine(C1left); :}
+						;
+						
+						
+MultipleCondFacts		::=		(NoMultipleCondFacts) {: RESULT=new NoMultipleCondFacts(); :} /* epsilon */
+						|		(MultipleConditionsAnd)	MultipleCondFacts:M1 BITWISE_AND CondFact:C2 {: RESULT=new MultipleConditionsAnd(M1, C2); RESULT.setLine(M1left); :}
+						;
+						
+						
+CondFact				::=		(SingleExpression) Expr:E1 {: RESULT=new SingleExpression(E1); RESULT.setLine(E1left); :}
+						|		(ExpressionWithRelationalOperator) Expr:E1 Relop:R2 Expr:E3 {: RESULT=new ExpressionWithRelationalOperator(E1, R2, E3); RESULT.setLine(E1left); :}
+						; 
+						
+						
+Expr					::=		(PositivePrefixTerm) Term:firstTerm MultipleAddopTerms:multipleTerm {: RESULT=new PositivePrefixTerm(firstTerm, multipleTerm); RESULT.setLine(firstTermleft); :}
+						|		(NegativePrefixTerm) NegatedTerm:N1 MultipleAddopTerms:M2 {: RESULT=new NegativePrefixTerm(N1, M2); RESULT.setLine(N1left); :}
+						;
+						
+						
+NegatedTerm				::=		(NegatedTerm) MINUS Term:T1 {: RESULT=new NegatedTerm(T1); RESULT.setLine(T1left); :}
+						;					
+						
+						
+MultipleAddopTerms		::=		(NoMultipleAddopTerms) {: RESULT=new NoMultipleAddopTerms(); :} /* epsilon */
+						|		(MultipleAddop) MultipleAddopTerms:M1 Addop:A2 Term:term {: RESULT=new MultipleAddop(M1, A2, term); RESULT.setLine(M1left); :}
+						;
+						
+			
+Term					::=		(Term) Factor:variable MultipleMulopFactors:recursiveVar {: RESULT=new Term(variable, recursiveVar); RESULT.setLine(variableleft); :}
+						;
+						
+						
+MultipleMulopFactors	::=		(NoMultipleMulopFactors) {: RESULT=new NoMultipleMulopFactors(); :} /* epsilon */
+						|		(MultipleMulop) MultipleMulopFactors:M1 Mulop:M2 Factor:variable {: RESULT=new MultipleMulop(M1, M2, variable); RESULT.setLine(M1left); :}
+						;
+						
+						
+Factor					::=		(FactorVariable) Designator:varName {: RESULT=new FactorVariable(varName); RESULT.setLine(varNameleft); :}
+						|		(FactorFunctionNoParam) Designator:methodName 	LEFT_PARENTHESIS 		 RIGHT_PARENTHESIS {: RESULT=new FactorFunctionNoParam(methodName); RESULT.setLine(methodNameleft); :}
+						|		(FactorFunctionWithParam) Designator:methodName LEFT_PARENTHESIS ActPars:A1 RIGHT_PARENTHESIS {: RESULT=new FactorFunctionWithParam(methodName, A1); RESULT.setLine(methodNameleft); :}
+						|		(FactorNumConst) NUM_CONST:N1 {: RESULT=new FactorNumConst(N1); RESULT.setLine(N1left); :}
+						|		(FactorCharConst) CHAR_CONST:C1 {: RESULT=new FactorCharConst(C1); RESULT.setLine(C1left); :}
+						|		(FactorBoolConst) BOOL_CONST:B1 {: RESULT=new FactorBoolConst(B1); RESULT.setLine(B1left); :}
+						|		(FactorObjectArray) NEW Type:arrayType LEFT_SQUARE_BRACKET Expr:expression RIGHT_SQUARE_BRACKET {: RESULT=new FactorObjectArray(arrayType, expression); RESULT.setLine(arrayTypeleft); :}
+						|		(FactorObjectNoParam) NEW Type:objectType LEFT_PARENTHESIS RIGHT_PARENTHESIS {: RESULT=new FactorObjectNoParam(objectType); RESULT.setLine(objectTypeleft); :}
+						|		(FactorObjectWithParam) NEW Type:objectType LEFT_PARENTHESIS ActPars:A1 RIGHT_PARENTHESIS {: RESULT=new FactorObjectWithParam(objectType, A1); RESULT.setLine(objectTypeleft); :}
+						|		(FactorParenthesisGrouping) LEFT_PARENTHESIS Expr:E1 RIGHT_PARENTHESIS {: RESULT=new FactorParenthesisGrouping(E1); RESULT.setLine(E1left); :}
+						;
+
+
+Designator				::=		(RegularDesignator) RegularDesignatorName:regularDesignator MultipleDesignatorExpansion:isArray {: RESULT=new RegularDesignator(regularDesignator, isArray); RESULT.setLine(regularDesignatorleft); :}
+						|		(ScopedDesignator) ScopedDesignatorName:S1 MultipleDesignatorExpansion:M2 {: RESULT=new ScopedDesignator(S1, M2); RESULT.setLine(S1left); :}
+						;
+						
+						
+RegularDesignatorName	::=		(RegularDesignatorName) IDENT:designatorName {: RESULT=new RegularDesignatorName(designatorName); RESULT.setLine(designatorNameleft); :}
+						;				
+						
+						
+ScopedDesignatorName	::=		(ScopedDesignatorName) IDENT:namespaceName SCOPE_OP IDENT:designatorName {: RESULT=new ScopedDesignatorName(namespaceName, designatorName); RESULT.setLine(namespaceNameleft); :}
+						;						
+						
+						
+MultipleDesignatorExpansion		::=		(NoMultipleDesignatorExpansion) {: RESULT=new NoMultipleDesignatorExpansion(); :} /* epsilon */
+								|		(MultipleDesignatorExpansionClassField) MultipleDesignatorExpansion:M1 DOT IDENT:I2 {: RESULT=new MultipleDesignatorExpansionClassField(M1, I2); RESULT.setLine(M1left); :} 
+								|		(MultipleDesignatorExpansionArray) MultipleDesignatorExpansion:M1 LEFT_SQUARE_BRACKET Expr:arrayExpr RIGHT_SQUARE_BRACKET {: RESULT=new MultipleDesignatorExpansionArray(M1, arrayExpr); RESULT.setLine(M1left); :}	
+								;
+						
+						
+Label					::=		(Label) IDENT:I1 {: RESULT=new Label(I1); RESULT.setLine(I1left); :}
+						;
+						
+						
+Assignop				::=		(Assignop) ASSIGN_OP {: RESULT=new Assignop(); :}
+						;
+						
+						
+Relop					::=		(RelopIsEqual) IS_EQUAL {: RESULT=new RelopIsEqual(); :}
+						|		(RelopNotEqual) NOT_EQUAL {: RESULT=new RelopNotEqual(); :}
+						|		(RelopGreaterThan) GREATER_THAN {: RESULT=new RelopGreaterThan(); :}
+						|		(RelopGreaterOrEqual) GREATER_OR_EQUAL {: RESULT=new RelopGreaterOrEqual(); :}
+						|		(RelopLowerThan) LOWER_THAN {: RESULT=new RelopLowerThan(); :}
+						|		(RelopLowerOrEqual) LOWER_OR_EQUAL {: RESULT=new RelopLowerOrEqual(); :}								
+						;
+
+
+Addop					::=		(AddopAddition) PLUS {: RESULT=new AddopAddition(); :}
+						|		(AddopSubstraction) MINUS {: RESULT=new AddopSubstraction(); :}
+						;
+						
+						
+Mulop					::=		(MulopMultiplication) MULTIPLY {: RESULT=new MulopMultiplication(); :}
+						|		(MulopDivision)	DIVIDE {: RESULT=new MulopDivision(); :}	
+						|		(MulopModulus) MODULUS {: RESULT=new MulopModulus(); :}
+						;	
+
+
+/* -------------------- Gramatika jezika END -------------------- */
+

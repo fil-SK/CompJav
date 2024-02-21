@@ -1,0 +1,413 @@
+/* ------------------------------- Import section START ---------------------------------- */
+
+package rs.ac.bg.etf.pp1;				/* Generisane klase idu u ovaj paket */
+
+import org.apache.log4j.*;
+import java_cup.runtime.*;
+import rs.ac.bg.etf.pp1.ast.*;
+
+
+
+/* ------------------------------- Import section END ---------------------------------- */
+
+
+
+/* -------------------- Metode za greske tokom parsiranja START ------------------------ */
+
+parser code {:
+	
+	Logger log = Logger.getLogger(getClass());
+	
+	boolean errorDetected;
+	// boolean errorDetected = false;
+   
+   
+    // slede redefinisani metodi za prijavu gresaka radi izmene teksta poruke
+    
+    
+    // Metoda koja se poziva kada ne mozemo da nastavimo parsiranje 
+    public void report_fatal_error(String message, Object info) throws java.lang.Exception {
+      done_parsing();
+      report_error(message, info);
+    }
+  
+  
+  	// Metoda u kojoj definisemo kako prijavljujemo gresku
+  	// Situacija u kojoj nastaje sintaksna greska je situacija u kojoj mozemo da se od te greske oporavimo
+    public void syntax_error(Symbol cur_token) {
+        report_error("\nSintaksna greska", cur_token);
+    }
+  
+  
+  	// Metoda koja se poziva kada parser NE MOZE da se oporavi od greske - greska se prijavljuje i parsiranje se zaustavlja
+    public void unrecovered_syntax_error(Symbol cur_token) throws java.lang.Exception {
+        report_fatal_error("Fatalna greska, parsiranje se ne moze nastaviti", cur_token);
+    }
+
+	
+	// Metoda za poruku za ispis greske
+    public void report_error(String message, Object info) {
+    	errorDetected = true;
+    	StringBuilder msg = new StringBuilder(message); 
+    	if (info instanceof Symbol)
+            msg.append (" na liniji ").append(((Symbol)info).left);
+        log.error(msg.toString());
+    }
+    
+    
+    
+    public void report_info(String message, Object info) {
+    	StringBuilder msg = new StringBuilder(message); 
+    	if (info instanceof Symbol)
+            msg.append (" na liniji ").append(((Symbol)info).left);
+        log.info(msg.toString());
+    }
+    
+:}
+
+
+
+init with {:
+	errorDetected = false;
+:}
+
+
+scan with {:
+
+	// Parser dohvata token od leksera i ako on nije null ispisujemo o kom simbolu je rec
+	
+	Symbol s = this.getScanner().next_token();
+	if (s != null && s.value != null) 
+		log.info(s.toString() + " " + s.value.toString());
+	return s;
+:}
+
+
+/* -------------------- Metode za greske tokom parsiranja END ------------------------ */
+
+
+
+/* -------------------- Lista terminala START -------------------- */
+
+terminal			PROGRAM, NAMESPACE, CONST, STATIC, VOID, READ, PRINT, RETURN, NEW;
+terminal			SEMI_COLON, COMMA, DOT;
+terminal			IF, ELSE, BREAK, CONTINUE, FOR, INCREMENT, DECREMENT;
+terminal			LEFT_CURLY_BRACKET, RIGHT_CURLY_BRACKET, LEFT_SQUARE_BRACKET, RIGHT_SQUARE_BRACKET, LEFT_PARENTHESIS, RIGHT_PARENTHESIS;
+terminal			BITWISE_AND, BITWISE_OR;
+terminal			ASSIGN_OP, SCOPE_OP;
+terminal			PLUS, MINUS, MULTIPLY, DIVIDE, MODULUS;
+terminal			IS_EQUAL, NOT_EQUAL, GREATER_THAN, GREATER_OR_EQUAL, LOWER_THAN, LOWER_OR_EQUAL;
+
+terminal			String IDENT;
+terminal			Integer NUM_CONST;
+terminal			Character CHAR_CONST;
+terminal			Boolean BOOL_CONST;
+
+/* -------------------- Lista terminala END -------------------- */
+
+
+
+/* --------------- Dodatni terminali koji postoje u MikroJava specifikaciji, ali se ne koriste START --------------- */
+
+terminal 			COLON, EXTENDS, ARROW, THIS, CLASS;
+
+/* --------------- Dodatni terminali koji postoje u MikroJava specifikaciji, ali se ne koriste END --------------- */
+
+
+
+/* -------------------- Lista neterminala START -------------------- */
+
+
+nonterminal			StaticInitializer, Label;
+nonterminal			ConstDecl, ConstVarDeclList, MultipleNumConstList, MultipleCharConstList, MultipleBoolConstList;
+nonterminal			VarDecl, MultipleVarDeclList, VarDeclList;
+nonterminal			Namespace, NamespaceList, NamespaceName;
+nonterminal			MethodDeclList;
+nonterminal			Statement, StatementList;
+nonterminal			FormPars, MultipleFormParsList, ActPars, MultipleParamsList;
+nonterminal			DesignatorStatement;
+nonterminal			Assignop, Relop, Mulop, Addop;
+nonterminal			Condition, CondTerm, MultipleCondTerms, CondFact, MultipleCondFacts;
+
+
+
+/* -------------------- Objektni cvorovi -------------------- */
+
+nonterminal	rs.etf.pp1.symboltable.concepts.Obj			Program, ProgramName;
+nonterminal	rs.etf.pp1.symboltable.concepts.Obj			MethodDecl, MethodTypeName, MethodVoidName;
+nonterminal	rs.etf.pp1.symboltable.concepts.Obj			Designator, RegularDesignatorName, ScopedDesignatorName, MultipleDesignatorExpansion;
+
+
+/* -------------------- Strukturni cvorovi START -------------------- */
+
+nonterminal	rs.etf.pp1.symboltable.concepts.Struct		Type, Factor, Term, NegatedTerm, Expr;
+nonterminal	rs.etf.pp1.symboltable.concepts.Struct		NumConstValue;
+nonterminal	rs.etf.pp1.symboltable.concepts.Struct		MultipleAddopTerms, MultipleMulopFactors;
+
+
+/* -------------------- Lista neterminala END -------------------- */
+
+
+/* Postavljanje prioriteta za IF-ELSE konstrukciju */
+precedence left ELSE;
+
+
+
+/* -------------------- Gramatika jezika START -------------------- */
+
+
+Program					::=		(Program) PROGRAM ProgramName:p NamespaceList ConstVarDeclList LEFT_CURLY_BRACKET MethodDeclList RIGHT_CURLY_BRACKET
+						;
+						
+						
+ProgramName				::=		(ProgramName) IDENT:programName
+						;						
+					
+					
+Namespace				::=		(Namespace) NAMESPACE NamespaceName LEFT_CURLY_BRACKET ConstVarDeclList LEFT_CURLY_BRACKET MethodDeclList RIGHT_CURLY_BRACKET RIGHT_CURLY_BRACKET
+						;
+						
+						
+NamespaceName			::=		(NamespaceName) IDENT:namespaceName
+						;				
+					
+					
+NamespaceList			::=		(NoNamespace) /* epsilon */
+						|		(MultipleNamespace) NamespaceList Namespace
+						;
+
+
+ConstDecl				::=		(NumConstDecl)  CONST Type:constType IDENT:numConstName  ASSIGN_OP NUM_CONST:numValue   MultipleNumConstList  SEMI_COLON
+						|		(CharConstDecl) CONST Type:constType IDENT:charConstName ASSIGN_OP CHAR_CONST:charValue MultipleCharConstList SEMI_COLON
+						|		(BoolConstDecl) CONST Type:constType IDENT:boolConstName ASSIGN_OP BOOL_CONST:boolValue MultipleBoolConstList SEMI_COLON
+						;
+
+
+ConstVarDeclList		::=		(NoConstVarDecl) /* epsilon */
+						|		(MultipleConstDecl) ConstVarDeclList ConstDecl
+						|		(MultipleVarDecl) ConstVarDeclList VarDecl
+						;	
+					
+					
+MultipleNumConstList	::=		(NoMultipleNumConstList) /* epsilon */
+						|		(MultipleNumConst) MultipleNumConstList COMMA IDENT:numConstName ASSIGN_OP NumConstValue:numConstValue
+						;
+						
+						
+NumConstValue			::=		(NumConstValue) NUM_CONST:numConstValue						
+						;
+						
+
+MultipleCharConstList	::=		(NoMultipleCharConstList) /* epsilon */
+						|		(MultipleCharConst) MultipleCharConstList COMMA IDENT:charConstName ASSIGN_OP CHAR_CONST
+						;
+						
+						
+MultipleBoolConstList	::=		(NoMultipleBoolConstList) /* epsilon */
+						|		(MultipleBoolConst) MultipleBoolConstList COMMA IDENT:boolConstName ASSIGN_OP BOOL_CONST
+						;
+						
+						
+VarDecl					::=		(RegularVariable) Type:variableType IDENT:variableName MultipleVarDeclList SEMI_COLON
+						|		(ArrayVariable)   Type IDENT:arrayName LEFT_SQUARE_BRACKET RIGHT_SQUARE_BRACKET MultipleVarDeclList SEMI_COLON
+						;
+						
+						
+MultipleVarDeclList		::=		(NoMultipleVarDeclList) /* epsilon */
+						|		(MultipleRegularVarDecl) MultipleVarDeclList COMMA IDENT:additionalVariableName
+						|		(MultipleArrayVarDecl) MultipleVarDeclList COMMA IDENT:additionalArrayVarName LEFT_SQUARE_BRACKET RIGHT_SQUARE_BRACKET
+						;
+						
+						
+StaticInitializer		::=		(StaticInitializer) STATIC LEFT_CURLY_BRACKET StatementList RIGHT_CURLY_BRACKET
+						;
+						
+						
+StatementList			::=		(NoStatementList) /* epsilon */
+						|		(MultipleStatementList) StatementList Statement
+						;
+						
+						
+MethodDecl				::=		(RetTypeMethodNoParam) 		MethodTypeName LEFT_PARENTHESIS 		 RIGHT_PARENTHESIS VarDeclList LEFT_CURLY_BRACKET StatementList RIGHT_CURLY_BRACKET
+						|		(RetTypeMethodWithParam)	MethodTypeName LEFT_PARENTHESIS FormPars RIGHT_PARENTHESIS VarDeclList LEFT_CURLY_BRACKET StatementList RIGHT_CURLY_BRACKET
+						|		(VoidMethodNoParam)			MethodVoidName LEFT_PARENTHESIS 		 RIGHT_PARENTHESIS VarDeclList LEFT_CURLY_BRACKET StatementList RIGHT_CURLY_BRACKET
+						|		(VoidMethodWithParam)		MethodVoidName LEFT_PARENTHESIS FormPars RIGHT_PARENTHESIS VarDeclList LEFT_CURLY_BRACKET StatementList RIGHT_CURLY_BRACKET
+						;
+						
+
+MethodTypeName			::=		(MethodTypeName) Type:returnType IDENT:methodName
+						;
+						
+						
+MethodVoidName			::=		(MethodVoidName) VOID:voidType IDENT:methodName
+						;
+						
+						
+MethodDeclList			::=		(NoMethodDecl) /* epsilon */
+						|		(MultipleMethodDecl) MethodDeclList MethodDecl
+						;
+						
+						
+VarDeclList				::=		(NoVarDecl) /* epsilon */
+						|		(VarDeclarations) VarDeclList VarDecl
+						;
+						
+
+FormPars				::=		(RegularParam) Type IDENT MultipleFormParsList
+						|		(ArrayParam) Type IDENT LEFT_SQUARE_BRACKET RIGHT_SQUARE_BRACKET MultipleFormParsList
+						;
+						
+						
+MultipleFormParsList	::=		(NoMultipleFormPars) /* epsilon */
+						|		(MultipleRegularFormPars) MultipleFormParsList COMMA Type IDENT
+						|		(MultipleArrayFormPars) MultipleFormParsList COMMA Type IDENT LEFT_SQUARE_BRACKET RIGHT_SQUARE_BRACKET
+						;
+						
+						
+Type					::=		(RegularType) IDENT:typeName
+						|		(ScopedType) IDENT:namespaceName SCOPE_OP IDENT:typeName
+						;
+						
+						
+Statement				::=		(DeclarationStatement) DesignatorStatement SEMI_COLON
+						|		(IfStatement) IF LEFT_PARENTHESIS Condition RIGHT_PARENTHESIS Statement
+						|		(IfElseStatement) IF LEFT_PARENTHESIS Condition RIGHT_PARENTHESIS Statement ELSE Statement
+						|		(BreakStatement) BREAK SEMI_COLON
+						|		(ContinueStatement) CONTINUE SEMI_COLON
+						|		(NoReturnStatement) RETURN SEMI_COLON
+						|		(ReturnStatement) RETURN Expr:returnExpr SEMI_COLON
+						|		(ReadStatement) READ LEFT_PARENTHESIS Designator RIGHT_PARENTHESIS SEMI_COLON
+						|		(PrintNoArgStatement) PRINT LEFT_PARENTHESIS Expr RIGHT_PARENTHESIS SEMI_COLON
+						|		(PrintWithArgStatement) PRINT LEFT_PARENTHESIS Expr COMMA NUM_CONST:width RIGHT_PARENTHESIS SEMI_COLON
+						|		(StatementBlock) LEFT_CURLY_BRACKET StatementList RIGHT_CURLY_BRACKET
+						
+						|		(SyntaxError) error SEMI_COLON:l
+								{: parser.report_error("Oporavak od greske do ; na liniji " + lleft, null); :}
+						;
+						
+						
+DesignatorStatement		::=		(AssignmentStatement) Designator:destination Assignop Expr:source
+						|		(FunctionCallNoParam) Designator LEFT_PARENTHESIS RIGHT_PARENTHESIS
+						|		(FunctionCallWithParam) Designator LEFT_PARENTHESIS ActPars RIGHT_PARENTHESIS
+						|		(IncrementStatement) Designator INCREMENT
+						|		(DecrementStatement) Designator DECREMENT
+						;
+						
+						
+ActPars					::=		(ActualParameters) Expr MultipleParamsList	
+						;
+						
+						
+MultipleParamsList		::=		(NoMultipleParams) /* epsilon */
+						|		(MultipleParams) MultipleParamsList COMMA Expr
+						;
+						
+						
+Condition				::=		(ConditionBitwiseOr) CondTerm MultipleCondTerms
+						;
+						
+						
+MultipleCondTerms		::=		(NoMultipleCondTerms) /* epsilon */
+						|		(MultipleConditionsOr) MultipleCondTerms BITWISE_OR CondTerm	
+						;
+						
+						
+CondTerm				::=		(ConditionBitwiseAnd) CondFact MultipleCondFacts
+						;
+						
+						
+MultipleCondFacts		::=		(NoMultipleCondFacts) /* epsilon */
+						|		(MultipleConditionsAnd)	MultipleCondFacts BITWISE_AND CondFact
+						;
+						
+						
+CondFact				::=		(SingleExpression) Expr
+						|		(ExpressionWithRelationalOperator) Expr Relop Expr
+						; 
+						
+						
+Expr					::=		(PositivePrefixTerm) Term:firstTerm MultipleAddopTerms:multipleTerm
+						|		(NegativePrefixTerm) NegatedTerm MultipleAddopTerms
+						;
+						
+						
+NegatedTerm				::=		(NegatedTerm) MINUS Term
+						;					
+						
+						
+MultipleAddopTerms		::=		(NoMultipleAddopTerms) /* epsilon */
+						|		(MultipleAddop) MultipleAddopTerms Addop Term:term
+						;
+						
+			
+Term					::=		(Term) Factor:variable MultipleMulopFactors:recursiveVar
+						;
+						
+						
+MultipleMulopFactors	::=		(NoMultipleMulopFactors) /* epsilon */
+						|		(MultipleMulop) MultipleMulopFactors Mulop Factor:variable
+						;
+						
+						
+Factor					::=		(FactorVariable) Designator:varName
+						|		(FactorFunctionNoParam) Designator:methodName 	LEFT_PARENTHESIS 		 RIGHT_PARENTHESIS
+						|		(FactorFunctionWithParam) Designator:methodName LEFT_PARENTHESIS ActPars RIGHT_PARENTHESIS
+						|		(FactorNumConst) NUM_CONST
+						|		(FactorCharConst) CHAR_CONST
+						|		(FactorBoolConst) BOOL_CONST
+						|		(FactorObjectArray) NEW Type:arrayType LEFT_SQUARE_BRACKET Expr:expression RIGHT_SQUARE_BRACKET
+						|		(FactorObjectNoParam) NEW Type:objectType LEFT_PARENTHESIS RIGHT_PARENTHESIS
+						|		(FactorObjectWithParam) NEW Type:objectType LEFT_PARENTHESIS ActPars RIGHT_PARENTHESIS
+						|		(FactorParenthesisGrouping) LEFT_PARENTHESIS Expr RIGHT_PARENTHESIS
+						;
+
+
+Designator				::=		(RegularDesignator) RegularDesignatorName:regularDesignator MultipleDesignatorExpansion:isArray
+						|		(ScopedDesignator) ScopedDesignatorName MultipleDesignatorExpansion
+						;
+						
+						
+RegularDesignatorName	::=		(RegularDesignatorName) IDENT:designatorName
+						;				
+						
+						
+ScopedDesignatorName	::=		(ScopedDesignatorName) IDENT:namespaceName SCOPE_OP IDENT:designatorName
+						;						
+						
+						
+MultipleDesignatorExpansion		::=		(NoMultipleDesignatorExpansion) /* epsilon */
+								|		(MultipleDesignatorExpansionClassField) MultipleDesignatorExpansion DOT IDENT 
+								|		(MultipleDesignatorExpansionArray) MultipleDesignatorExpansion LEFT_SQUARE_BRACKET Expr:arrayExpr RIGHT_SQUARE_BRACKET	
+								;
+						
+						
+Label					::=		(Label) IDENT
+						;
+						
+						
+Assignop				::=		(Assignop) ASSIGN_OP
+						;
+						
+						
+Relop					::=		(RelopIsEqual) IS_EQUAL
+						|		(RelopNotEqual) NOT_EQUAL
+						|		(RelopGreaterThan) GREATER_THAN
+						|		(RelopGreaterOrEqual) GREATER_OR_EQUAL
+						|		(RelopLowerThan) LOWER_THAN
+						|		(RelopLowerOrEqual) LOWER_OR_EQUAL								
+						;
+
+
+Addop					::=		(AddopAddition) PLUS
+						|		(AddopSubstraction) MINUS
+						;
+						
+						
+Mulop					::=		(MulopMultiplication) MULTIPLY
+						|		(MulopDivision)	DIVIDE	
+						|		(MulopModulus) MODULUS
+						;	
+
+
+/* -------------------- Gramatika jezika END -------------------- */
+
